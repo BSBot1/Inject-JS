@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Auto Script Injector</title>
+  <style>
+    :root { --gap: 12px; }
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 0; padding: 24px; line-height: 1.4; }
+    h1 { font-size: 1.4rem; margin: 0 0 12px; }
+    .card { max-width: 900px; margin: 0 auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 12px; }
+    label { display: block; font-weight: 600; margin-top: var(--gap); }
+    input, textarea { width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 8px; font: inherit; }
+    textarea { min-height: 140px; }
+    .row { display: grid; grid-template-columns: 1fr 180px; gap: var(--gap); }
+    .btns { display: flex; gap: var(--gap); margin-top: 16px; flex-wrap: wrap; }
+    button { padding: 10px 16px; border: 1px solid #111827; background: #111827; color: #fff; border-radius: 8px; cursor: pointer; font: inherit; }
+    button.secondary { background: #fff; color: #111827; }
+    .muted { color: #6b7280; font-size: .95rem; }
+    .status { background: #f9fafb; border: 1px dashed #d1d5db; border-radius: 8px; padding: 10px; margin-top: 12px; white-space: pre-wrap; }
+    .urlpreview { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .9rem; word-break: break-all; }
+    footer { max-width: 900px; margin: 16px auto 0; padding: 0 2px; color: #6b7280; font-size: .9rem; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Auto Script Injector</h1>
+    <p class="muted">Öffnet eine Ziel-URL über deinen Cloudflare Worker und führt dort nach X Sekunden deinen JavaScript‑Code aus.</p>
+
+    <label for="url">Ziel‑URL (z. B. google.com):</label>
+    <input id="url" type="text" placeholder="example.com">
+
+    <div class="row">
+      <div>
+        <label for="delay">Verzögerung (Sekunden):</label>
+        <input id="delay" type="number" min="0" value="10">
+      </div>
+      <div>
+        <label for="preset">Beispiel-Code einfügen:</label>
+        <div class="btns">
+          <button class="secondary" type="button" onclick="setCode(`alert('Hallo!')`)">alert()</button>
+          <button class="secondary" type="button" onclick="setCode(`console.log('Injected at', new Date())`)">console.log</button>
+        </div>
+      </div>
+    </div>
+
+    <label for="jsCode">JavaScript‑Code:</label>
+    <textarea id="jsCode" placeholder="alert('Hallo!');"></textarea>
+
+    <div class="btns">
+      <button type="button" onclick="openNow()">Starten (neuer Tab)</button>
+      <button class="secondary" type="button" onclick="copyLink()">Link kopieren</button>
+    </div>
+
+    <div class="status">
+      <div><strong>Worker:</strong> <span class="urlpreview">https://inject-js-proxy.bsbot1nr1.workers.dev</span></div>
+      <div style="margin-top:8px;"><strong>Vorschau‑Link:</strong> <span id="preview" class="urlpreview">—</span></div>
+      <div id="msg" class="muted" style="margin-top:8px;">Noch nichts gestartet…</div>
+    </div>
+
+  </div>
+
+  <footer>
+    Hinweis: Auf Seiten mit sehr restriktiven Sicherheits‑Headern (CSP/XFO/COOP) kann die Injection blockiert werden.
+  </footer>
+
+  <script>
+    const WORKER_URL = "https://inject-js-proxy.bsbot1nr1.workers.dev";
+
+    function normalizeUrl(input) {
+      let url = (input || '').trim();
+      if (!url) return '';
+      if (/^https?:\/\//i.test(url)) return url;
+      if (/^www\./i.test(url)) return 'https://' + url;
+      return 'https://' + url;
+    }
+
+    function setCode(code) {
+      document.getElementById('jsCode').value = code;
+      updatePreview();
+    }
+
+    function buildUrl() {
+      const rawUrl = document.getElementById('url').value;
+      const url = normalizeUrl(rawUrl);
+      const delay = (document.getElementById('delay').value || '0').trim();
+      const jsCode = document.getElementById('jsCode').value || "console.log('injected')";
+
+      if (!url) return '';
+
+      return WORKER_URL + '/' + url +
+        '?delay=' + encodeURIComponent(delay) +
+        '&code=' + encodeURIComponent(jsCode);
+    }
+
+    function updatePreview() {
+      const p = document.getElementById('preview');
+      const u = buildUrl();
+      p.textContent = u || '—';
+    }
+
+    function openNow() {
+      const finalUrl = buildUrl();
+      const msg = document.getElementById('msg');
+      if (!finalUrl) {
+        alert('Bitte eine gültige Ziel‑URL eingeben.');
+        return;
+      }
+      msg.textContent = 'Öffne Ziel über Worker…';
+      window.open(finalUrl, '_blank');
+    }
+
+    function copyLink() {
+      const finalUrl = buildUrl();
+      if (!finalUrl) {
+        alert('Bitte eine gültige Ziel‑URL eingeben.');
+        return;
+      }
+      navigator.clipboard.writeText(finalUrl).then(() => {
+        document.getElementById('msg').textContent = 'Link in die Zwischenablage kopiert.';
+      }, () => {
+        document.getElementById('msg').textContent = 'Kopieren nicht erlaubt – bitte manuell markieren.';
+      });
+    }
+
+    document.getElementById('url').addEventListener('input', updatePreview);
+    document.getElementById('delay').addEventListener('input', updatePreview);
+    document.getElementById('jsCode').addEventListener('input', updatePreview);
+    updatePreview();
+  </script>
+</body>
+</html>
